@@ -42,7 +42,7 @@ switch($p.Name.Convention)
 $account = [PSCustomObject]@{
     GEBRCODE						= $aRef;
     GEBR_OMS						= $displayname;
-    EMAIL							= $p.Accounts.MicrosoftActiveDirectoryCorp.UserPrincipalName;
+    EMAIL							= $p.Accounts.MicrosoftActiveDirectory.UserPrincipalName;
 };
 
 if(-Not($dryRun -eq $True)) {
