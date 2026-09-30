@@ -56,6 +56,7 @@
     - [Common Oracle errors](#common-oracle-errors)
   - [Development resources](#development-resources)
     - [Database objects](#database-objects)
+    - [Oracle documentation](#oracle-documentation)
     - [Script conventions](#script-conventions)
   - [Getting help](#getting-help)
   - [HelloID docs](#helloid-docs)
@@ -369,6 +370,15 @@ The following database objects are used by the connector:
 | `MENU_B_GROUP` | `permissions/menuGroups` | Available menu groups |
 | `MENU_B_USER` | `permissions/menuGroups` | Menu-group assignments per Oracle user |
 | `DeleteStoredProcedureName` | Delete (optional) | Customer-specific delete procedure, called with `GEBR_ORA` |
+
+### Oracle documentation
+
+- [SELECT](https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/SELECT.html)
+- [INSERT](https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/INSERT.html)
+- [UPDATE](https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/UPDATE.html)
+- [DELETE](https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/DELETE.html)
+- [GRANT](https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/GRANT.html) (object privileges on tables, for the service account)
+- [PL/SQL Language Reference](https://docs.oracle.com/en/database/oracle/oracle-database/19/lnpls/index.html) (the delete stored procedure is executed in an anonymous PL/SQL block)
 
 ### Script conventions
 
