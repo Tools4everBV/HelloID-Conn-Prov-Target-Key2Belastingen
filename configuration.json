@@ -1,36 +1,64 @@
 [
-  {
-    "key": "dataSource",
-    "type": "input",
-    "defaultValue": "",
-    "templateOptions": {
-      "label": "Data Source",
-      "placeholder": "",
-      "description": "",
-      "required": true
+    {
+        "key": "DataSource",
+        "type": "input",
+        "defaultValue": "",
+        "templateOptions": {
+            "label": "Data Source",
+            "placeholder": "server:1521/service",
+            "description": "The Oracle connection string data source, format [server]:[port]/[service]. Same database as the Key2BelastingenOracle connector. When using integrated security, append ';Integrated Security=yes'.",
+            "required": true
+        }
+    },
+    {
+        "key": "Username",
+        "type": "input",
+        "defaultValue": "",
+        "templateOptions": {
+            "label": "Username",
+            "placeholder": "SVC_HelloID",
+            "description": "The username of the Oracle service account used by HelloID. Leave both Username and Password empty when the Data Source contains 'Integrated Security=yes'.",
+            "required": false
+        }
+    },
+    {
+        "key": "Password",
+        "type": "input",
+        "defaultValue": "",
+        "templateOptions": {
+            "label": "Password",
+            "type": "password",
+            "description": "The password of the Oracle service account. Leave both Username and Password empty when using integrated security.",
+            "required": false
+        }
+    },
+    {
+        "key": "DeleteStoredProcedureName",
+        "type": "input",
+        "defaultValue": "",
+        "templateOptions": {
+            "label": "Delete stored procedure name (optional)",
+            "description": "Optional. Leave empty (default) to soft-delete by updating the fields mapped for the Delete action. Only fill in when a customer-specific delete stored procedure must be used: this option is Fit For Purpose (FFP): it was built for the specific requirements of one implementation, is not part of Key2 Belastingen itself and may not apply to every implementation. The consultant must review what the procedure does and adjust the delete script where needed. The procedure receives the Oracle username (GEBR_ORA) as its only argument.",
+            "required": false
+        }
+    },
+    {
+        "key": "ManageMduUser",
+        "type": "checkbox",
+        "defaultValue": false,
+        "templateOptions": {
+            "label": "Create MDU_GEBRUIKER record",
+            "description": "Optional. Create the legacy MDU_GEBRUIKER record after WMS_GEBRCODE creation. Disabled by default; enable only when required by the target environment."
+        }
+    },
+    {
+        "key": "MduInDirectorySuffix",
+        "type": "input",
+        "defaultValue": "\\ACC\\InFiles",
+        "templateOptions": {
+            "label": "MDU input directory suffix",
+            "description": "Suffix appended to the lowercase Oracle username for MDU_IN_DIR when MDU_GEBRUIKER management is enabled.",
+            "required": false
+        }
     }
-  },
-  {
-    "key": "Username",
-    "type": "input",
-    "defaultValue": "",
-    "templateOptions": {
-      "label": "Username",
-      "placeholder": "",
-      "description": "",
-      "required": true
-    }
-  },
-  {
-    "key": "Password",
-    "type": "input",
-    "defaultValue": "",
-    "templateOptions": {
-      "label": "Password",
-      "type": "password",
-      "placeholder": "",
-      "description": "",
-      "required": true
-    }
-  }
 ]
