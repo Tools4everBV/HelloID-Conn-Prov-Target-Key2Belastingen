@@ -1,6 +1,11 @@
 #################################################
-# HelloID-Conn-Prov-Target-Key2Belastingen-Disable
+# HelloID-Conn-Prov-Target-Key2Belastingen-GrantPermission-MenuGroups
 # PowerShell V2
+#
+# FIT FOR PURPOSE (FFP): menu-group permissions (MENU_B_GROUP/MENU_B_USER)
+# This optional permissiontype comes from a previous implementation and was not used in the implementation this
+# connector was rebuilt for. It is not certain that every implementation manages menu groups this way. Test before use.
+# See README.md, section "Fit For Purpose (FFP)".
 #################################################
 
 # Enable TLS1.2
@@ -130,27 +135,14 @@ try {
     $actionMessage = 'opening Oracle connection'
     $connection = New-OracleConnection @splatNewOracleConnection
 
-    $outputFields = @($outputContext.Data.PSObject.Properties.Name | Where-Object { $_ })
-    # Governance reconciliation resolutions run without person context, so the Disable field mapping is not available.
-    # Apply the same value as the supplied field mapping: INDACTIEF = N. Keep these values in sync with the Disable field mapping.
-    if ($actionContext.ReconciliationOrigin -eq 'reconciliation') {
-        $actionContext.Data = [PSCustomObject]@{
-            INDACTIEF = 'N'
-        }
-        $outputFields = @(@('GEBRCODE') + $outputFields + @($actionContext.Data.PSObject.Properties.Name | Where-Object { $_ }) | Select-Object -Unique)
-        Write-Information "Reconciliation mode: disable ($(($actionContext.Data.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ', '))"
-    }
-    $actionMessage = 'verifying mapped fields'
-    $actionFields = @($actionContext.Data.PSObject.Properties.Name | Where-Object { $_ -and $_ -notin @('GEBRCODE', 'GEBR_ORA') })
-    if (($actionFields | Measure-Object).Count -eq 0) {
-        throw 'No fields are mapped for the Disable action. Map at least INDACTIEF with value N.'
-    }
+    # MENU_B_USER is linked on the Oracle username (GEBR_ORA), not on the account reference (GEBRCODE)
     $actionMessage = "querying WMS_GEBRCODE where GEBRCODE = [$($actionContext.References.Account)]"
     $queryGetAccount = "
     SELECT
-        $((@('GEBRCODE') + $outputFields | Select-Object -Unique) -join ', ')
+        GEBRCODE,
+        GEBR_ORA
     FROM WMS_GEBRCODE
-    WHERE GEBRCODE = '$($actionContext.References.Account)'
+    WHERE GEBRCODE = $(ConvertTo-OracleSqlLiteral -Value $actionContext.References.Account)
     "
     $splatQueryGetAccount = @{
         Connection = $connection
@@ -161,26 +153,28 @@ try {
 
     $actionMessage = 'determining action'
     if (($correlatedAccount | Measure-Object).Count -eq 1) {
-        $outputContext.PreviousData = ($correlatedAccount | Select-Object -Property $outputFields | ConvertTo-Json -Depth 10 | ConvertFrom-Json)
-        $outputContext.Data = ($correlatedAccount | Select-Object -Property $outputFields | ConvertTo-Json -Depth 10 | ConvertFrom-Json)
-
-        $desiredProperties = foreach ($fieldName in $actionFields) {
-            [PSCustomObject]@{
-                Name  = $fieldName
-                Value = if ([string]::IsNullOrEmpty([string]$actionContext.Data.$fieldName)) { '' } else { [string]$actionContext.Data.$fieldName }
-            }
-            $outputContext.Data.$fieldName = $actionContext.Data.$fieldName
+        if ([string]::IsNullOrEmpty($correlatedAccount.GEBR_ORA)) {
+            throw "WMS_GEBRCODE record [$($actionContext.References.Account)] has no Oracle username (GEBR_ORA)."
         }
-        $currentProperties = foreach ($fieldName in $actionFields) {
-            [PSCustomObject]@{
-                Name  = $fieldName
-                Value = if ([string]::IsNullOrEmpty([string]$correlatedAccount.$fieldName)) { '' } else { [string]$correlatedAccount.$fieldName }
-            }
-        }
-        $propertiesChanged = @(Compare-Object -ReferenceObject $currentProperties -DifferenceObject $desiredProperties -Property Name, Value -PassThru | Where-Object SideIndicator -eq '=>' | Select-Object -ExpandProperty Name)
 
-        if (($propertiesChanged | Measure-Object).Count -gt 0) {
-            $action = 'DisableAccount'
+        # MENU_B_USER has no known unique constraint, so the current assignment is checked to prevent duplicate rows
+        $actionMessage = "querying menu group [$($actionContext.References.Permission.Id)] for Oracle user [$($correlatedAccount.GEBR_ORA)]"
+        $queryGetAssignedPermission = "
+        SELECT
+            GROUP_NAME
+        FROM MENU_B_USER
+        WHERE GROUP_NAME = $(ConvertTo-OracleSqlLiteral -Value $actionContext.References.Permission.Id)
+        AND USER_NAME = $(ConvertTo-OracleSqlLiteral -Value $correlatedAccount.GEBR_ORA)
+        "
+        $splatQueryGetAssignedPermission = @{
+            Connection = $connection
+            Query      = $queryGetAssignedPermission
+            NonQuery   = $false
+        }
+        $assignedPermission = Invoke-OracleQuery @splatQueryGetAssignedPermission
+
+        if (($assignedPermission | Measure-Object).Count -eq 0) {
+            $action = 'GrantPermission'
         }
         else {
             $action = 'NoChanges'
@@ -195,41 +189,43 @@ try {
     Write-Information "Determined action: [$action]"
 
     switch ($action) {
-        'DisableAccount' {
-            $actionMessage = "disabling WMS_GEBRCODE record [$($actionContext.References.Account)]. Properties changed: [$($propertiesChanged -join ', ')]"
-            $setClauses = foreach ($fieldName in $propertiesChanged) {
-                $sqlValue = ConvertTo-OracleSqlLiteral -Value $actionContext.Data.$fieldName
-                "$fieldName = $sqlValue"
-            }
-            $queryDisableAccount = "
-            UPDATE WMS_GEBRCODE
-            SET $($setClauses -join ', ')
-            WHERE GEBRCODE = '$($actionContext.References.Account)'
+        'GrantPermission' {
+            $actionMessage = "granting menu group: [$($actionContext.References.Permission.Id)] to Oracle user: [$($correlatedAccount.GEBR_ORA)]"
+            $queryGrantPermission = "
+            INSERT INTO MENU_B_USER (
+                GROUP_NAME,
+                USER_NAME
+            )
+            VALUES (
+                $(ConvertTo-OracleSqlLiteral -Value $actionContext.References.Permission.Id),
+                $(ConvertTo-OracleSqlLiteral -Value $correlatedAccount.GEBR_ORA)
+            )
             "
-            $splatQueryDisableAccount = @{
+            $splatQueryGrantPermission = @{
                 Connection = $connection
-                Query      = $queryDisableAccount
+                Query      = $queryGrantPermission
                 NonQuery   = $true
             }
 
             if (-not ($actionContext.DryRun -eq $true)) {
-                [void](Invoke-OracleQuery @splatQueryDisableAccount)
+                [void](Invoke-OracleQuery @splatQueryGrantPermission)
 
                 $outputContext.AuditLogs.Add([PSCustomObject]@{
-                        Action  = 'DisableAccount'
-                        Message = "Disabled WMS_GEBRCODE record [$($actionContext.References.Account)]. Properties changed: [$($propertiesChanged -join ', ')]"
+                        Action  = 'GrantPermission'
+                        Message = "Granted menu group: [$($actionContext.References.Permission.Id)] to Oracle user: [$($correlatedAccount.GEBR_ORA)]"
                         IsError = $false
                     })
             }
             else {
-                Write-Information "[DryRun] Would disable WMS_GEBRCODE record [$($actionContext.References.Account)]. Properties changed: [$($propertiesChanged -join ', ')]"
+                Write-Information "[DryRun] Would grant menu group: [$($actionContext.References.Permission.Id)] to Oracle user: [$($correlatedAccount.GEBR_ORA)]"
             }
             break
         }
 
         'NoChanges' {
             $outputContext.AuditLogs.Add([PSCustomObject]@{
-                    Message = "Skipped disabling WMS_GEBRCODE record [$($actionContext.References.Account)]. Reason: Already disabled."
+                    Action  = 'GrantPermission'
+                    Message = "Skipped granting menu group: [$($actionContext.References.Permission.Id)] to Oracle user: [$($correlatedAccount.GEBR_ORA)]. Reason: Menu group already granted."
                     IsError = $false
                 })
             break
